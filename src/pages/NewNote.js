@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { IconButton, Tooltip, MenuItem, Select, FormControl, Snackbar, Alert } from '@mui/material';
@@ -6,23 +6,29 @@ import {
   FormatBold, FormatItalic, FormatUnderlined, Code,
   FormatQuote, FormatListBulleted, FormatListNumbered
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 const NewNote = () => {
-  const [content, setContent] = useState('');
+  const location = useLocation();
+  const [content, setContent] = useState(location.state?.content || ''); // Ambil konten jika ada
+  const [noteName, setNoteName] = useState(location.state?.name || '');  // Ambil nama catatan jika ada
   const [fontSize, setFontSize] = useState('100%');
-  const [noteName, setNoteName] = useState('');
-  const [popupVisible, setPopupVisible] = useState(false); // Popup untuk nama catatan
-  const [showSnackbar, setShowSnackbar] = useState(false); // Snackbar untuk notifikasi sukses
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [showSnackbar, setShowSnackbar] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(!!location.state?.name); // Cek apakah ini mode edit
   const quillRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Tentukan apakah dalam mode edit atau buat baru
+    setIsEditMode(!!location.state?.name);
+  }, [location.state?.name]);
 
   const handleContentChange = (value) => setContent(value);
 
   const handleSave = () => {
-    // Tampilkan popup untuk meminta nama catatan
-    setPopupVisible(true);
+    setPopupVisible(true); // Tampilkan popup untuk input nama catatan
   };
 
   const confirmSave = async () => {
@@ -32,16 +38,20 @@ const NewNote = () => {
     }
 
     try {
-      // Kirim catatan ke server
-      const response = await axios.post('http://localhost:5000/api/notes', { content, name: noteName });
-      if (response.status === 200) {
-        // Tampilkan notifikasi berhasil dan reset form
-        setShowSnackbar(true);
-        setContent(''); // Kosongkan editor setelah menyimpan
-        setPopupVisible(false);
-        setTimeout(() => navigate('/'), 2000); // Navigasi setelah 2 detik
+      let response;
+      if (isEditMode) {
+        // Jika mode edit, perbarui catatan yang ada
+        response = await axios.put(`http://localhost:5000/api/notes/${noteName}`, { content });
       } else {
-        alert('Failed to save the note.');
+        // Jika mode buat baru, simpan catatan baru
+        response = await axios.post('http://localhost:5000/api/notes', { content, name: noteName });
+      }
+
+      if (response.status === 200 || response.status === 201) {
+        // Tampilkan notifikasi sukses dan reset form
+        setShowSnackbar(true);
+        setPopupVisible(false); // Tutup popup setelah menyimpan
+        setTimeout(() => navigate('/'), 2000); // Kembali ke halaman utama setelah 2 detik
       }
     } catch (error) {
       console.error('Error saving note:', error);
@@ -49,7 +59,9 @@ const NewNote = () => {
     }
   };
 
-  const handlePreview = () => navigate('/preview', { state: { content } });
+  const handlePreview = () => {
+    navigate('/preview', { state: { content } });
+  };
 
   const applyFormatting = (format) => {
     const editor = quillRef.current.getEditor();
@@ -75,7 +87,7 @@ const NewNote = () => {
 
   return (
     <div className="p-6 flex flex-col h-full">
-      <h2 className="text-2xl font-bold mb-4">New Note</h2>
+      <h2 className="text-2xl font-bold mb-4">{isEditMode ? 'Edit Note' : 'New Note'}</h2>
       <div className="flex space-x-2 mb-4">
         <Tooltip title="Bold">
           <IconButton onClick={() => applyFormatting('bold')}>
@@ -139,7 +151,7 @@ const NewNote = () => {
       </div>
       <div className="mt-4 flex space-x-2">
         <button onClick={handleSave} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-          Save Note
+          {isEditMode ? 'Update Note' : 'Save Note'}
         </button>
         <button onClick={handlePreview} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
           Preview
@@ -159,7 +171,7 @@ const NewNote = () => {
             />
             <div className="flex justify-end mt-4">
               <button onClick={confirmSave} className="px-4 py-2 bg-blue-500 text-white rounded">
-                Save
+                {isEditMode ? 'Update Note' : 'Save Note'}
               </button>
             </div>
           </div>
@@ -173,7 +185,7 @@ const NewNote = () => {
         onClose={() => setShowSnackbar(false)}
       >
         <Alert onClose={() => setShowSnackbar(false)} severity="success" sx={{ width: '100%' }}>
-          Note saved successfully!
+          {isEditMode ? 'Note updated successfully!' : 'Note saved successfully!'}
         </Alert>
       </Snackbar>
     </div>
