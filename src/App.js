@@ -25,7 +25,7 @@ function App() {
         <div className="flex-grow p-6 overflow-auto">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/notes" element={<Notes />} />
+            <Route path="/notes/:noteName" element={<Notes />} />
             <Route path="/new-note" element={<NewNote />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/preview" element={<Preview />} />

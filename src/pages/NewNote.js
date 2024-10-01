@@ -1,67 +1,68 @@
-// src/components/NewNote.js
 import React, { useState, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { IconButton, Tooltip, MenuItem, Select, FormControl } from '@mui/material';
+import { IconButton, Tooltip, MenuItem, Select, FormControl, Snackbar, Alert } from '@mui/material';
 import {
-  FormatBold,
-  FormatItalic,
-  FormatUnderlined,
-  Code,
-  FormatQuote,
-  FormatListBulleted,
-  FormatListNumbered,
-  TextFields
+  FormatBold, FormatItalic, FormatUnderlined, Code,
+  FormatQuote, FormatListBulleted, FormatListNumbered
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const NewNote = () => {
   const [content, setContent] = useState('');
-  const [fontSize, setFontSize] = useState('100%'); // Default size as 100%
+  const [fontSize, setFontSize] = useState('100%');
+  const [noteName, setNoteName] = useState('');
+  const [popupVisible, setPopupVisible] = useState(false); // Popup untuk nama catatan
+  const [showSnackbar, setShowSnackbar] = useState(false); // Snackbar untuk notifikasi sukses
   const quillRef = useRef(null);
   const navigate = useNavigate();
 
-  const handleContentChange = (value) => {
-    setContent(value);
-  };
+  const handleContentChange = (value) => setContent(value);
 
   const handleSave = () => {
-    console.log('Saved content:', content);
-    // Save logic here
+    // Tampilkan popup untuk meminta nama catatan
+    setPopupVisible(true);
   };
 
-  const handlePreview = () => {
-    navigate('/preview', { state: { content } });
+  const confirmSave = async () => {
+    if (!noteName) {
+      alert('Note name is required.');
+      return;
+    }
+
+    try {
+      // Kirim catatan ke server
+      const response = await axios.post('http://localhost:5000/api/notes', { content, name: noteName });
+      if (response.status === 200) {
+        // Tampilkan notifikasi berhasil dan reset form
+        setShowSnackbar(true);
+        setContent(''); // Kosongkan editor setelah menyimpan
+        setPopupVisible(false);
+        setTimeout(() => navigate('/'), 2000); // Navigasi setelah 2 detik
+      } else {
+        alert('Failed to save the note.');
+      }
+    } catch (error) {
+      console.error('Error saving note:', error);
+      alert('An error occurred while saving the note.');
+    }
   };
+
+  const handlePreview = () => navigate('/preview', { state: { content } });
 
   const applyFormatting = (format) => {
     const editor = quillRef.current.getEditor();
     editor.focus();
-
     switch (format) {
-      case 'bold':
-        editor.format('bold', !editor.getFormat().bold);
-        break;
-      case 'italic':
-        editor.format('italic', !editor.getFormat().italic);
-        break;
-      case 'underline':
-        editor.format('underline', !editor.getFormat().underline);
-        break;
-      case 'code':
-        editor.format('code-block', !editor.getFormat()['code-block']);
-        break;
-      case 'blockquote':
-        editor.format('blockquote', !editor.getFormat().blockquote);
-        break;
-      case 'bulletedList':
-        editor.format('list', editor.getFormat().list === 'bullet' ? false : 'bullet');
-        break;
-      case 'numberedList':
-        editor.format('list', editor.getFormat().list === 'ordered' ? false : 'ordered');
-        break;
-      default:
-        return;
+      case 'bold': editor.format('bold', !editor.getFormat().bold); break;
+      case 'italic': editor.format('italic', !editor.getFormat().italic); break;
+      case 'underline': editor.format('underline', !editor.getFormat().underline); break;
+      case 'code': editor.format('code-block', !editor.getFormat()['code-block']); break;
+      case 'blockquote': editor.format('blockquote', !editor.getFormat().blockquote); break;
+      case 'bulletedList': editor.format('list', editor.getFormat().list === 'bullet' ? false : 'bullet'); break;
+      case 'numberedList': editor.format('list', editor.getFormat().list === 'ordered' ? false : 'ordered'); break;
+      default: return;
     }
   };
 
@@ -119,10 +120,10 @@ const NewNote = () => {
             inputProps={{ 'aria-label': 'Text Size' }}
             style={{ width: 100 }}
           >
-            <MenuItem value="80%">80%</MenuItem> {/* Small */}
-            <MenuItem value="100%">100%</MenuItem> {/* Normal */}
-            <MenuItem value="120%">120%</MenuItem> {/* Large */}
-            <MenuItem value="150%">150%</MenuItem> {/* Huge */}
+            <MenuItem value="80%">80%</MenuItem>
+            <MenuItem value="100%">100%</MenuItem>
+            <MenuItem value="120%">120%</MenuItem>
+            <MenuItem value="150%">150%</MenuItem>
           </Select>
         </FormControl>
       </div>
@@ -132,24 +133,49 @@ const NewNote = () => {
           value={content}
           onChange={handleContentChange}
           placeholder="Start typing your note..."
-          modules={{ toolbar: false }} // Disable default toolbar
+          modules={{ toolbar: false }}
           style={{ height: 'calc(100vh - 200px)', backgroundColor: 'white' }}
         />
       </div>
       <div className="mt-4 flex space-x-2">
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
+        <button onClick={handleSave} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
           Save Note
         </button>
-        <button
-          onClick={handlePreview}
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-        >
+        <button onClick={handlePreview} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
           Preview
         </button>
       </div>
+
+      {/* Popup untuk nama catatan */}
+      {popupVisible && (
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-500 bg-opacity-50">
+          <div className="bg-white p-6 rounded shadow">
+            <h3 className="text-lg font-bold">Enter Note Name</h3>
+            <input
+              type="text"
+              value={noteName}
+              onChange={(e) => setNoteName(e.target.value)}
+              className="border p-2 rounded w-full mt-2"
+            />
+            <div className="flex justify-end mt-4">
+              <button onClick={confirmSave} className="px-4 py-2 bg-blue-500 text-white rounded">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Snackbar untuk notifikasi sukses */}
+      <Snackbar
+        open={showSnackbar}
+        autoHideDuration={2000}
+        onClose={() => setShowSnackbar(false)}
+      >
+        <Alert onClose={() => setShowSnackbar(false)} severity="success" sx={{ width: '100%' }}>
+          Note saved successfully!
+        </Alert>
+      </Snackbar>
     </div>
   );
 };
